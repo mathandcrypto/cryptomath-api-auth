@@ -5,13 +5,13 @@ import { ConfigService } from '@nestjs/config';
 export class AuthConfigService {
   constructor(private configService: ConfigService) {}
 
-  get authSessionMaxAge(): number {
-    return this.configService.get<number>('auth.authSessionMaxAge');
+  get accessSessionMaxAge(): number {
+    return this.configService.get<number>('auth.accessSessionMaxAge');
   }
 
-  get authSessionExpirationDate(): Date {
+  get accessSessionExpirationDate(): Date {
     const date = new Date();
-    date.setHours(date.getHours() - this.authSessionMaxAge);
+    date.setHours(date.getHours() - this.accessSessionMaxAge);
 
     return date;
   }
@@ -25,5 +25,9 @@ export class AuthConfigService {
     date.setDate(date.getDate() - this.refreshSessionMaxAge);
 
     return date;
+  }
+
+  get maxRefreshSessions(): number {
+    return this.configService.get<number>('auth.maxRefreshSessions');
   }
 }

@@ -250,13 +250,9 @@ export class AuthService {
       const deleteRefreshSessions = await this.prisma.refreshSession.deleteMany(
         {
           where: {
-            OR: [
-              {
-                createdAt: {
-                  lte: this.authConfigService.refreshSessionExpirationDate,
-                },
-              },
-            ],
+            createdAt: {
+              lte: this.authConfigService.refreshSessionExpirationDate,
+            },
           },
         },
       );

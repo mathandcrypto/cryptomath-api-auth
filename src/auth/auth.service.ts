@@ -51,7 +51,6 @@ export class AuthService {
     const refreshSecret = await this.encryptionService.generateSecret(
       userId,
       accessSecret,
-      11,
     );
 
     try {

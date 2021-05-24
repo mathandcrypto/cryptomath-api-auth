@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BaseSerializerService } from '@common/serializers/base.serializer';
 import { AccessSession as AccessSessionPrisma } from '@prisma/client';
-import { AccessSession as AccessSessionProto } from 'cryptomath-api-proto/proto/build/auth';
+import { AccessSession as AccessSessionProto } from 'cryptomath-api-proto/types/auth';
 
 @Injectable()
 export class AccessSessionSerializerService extends BaseSerializerService<

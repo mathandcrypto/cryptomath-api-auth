@@ -14,11 +14,11 @@ import {
   DeleteRefreshSessionResponse,
   DeleteAllUserSessionsRequest,
   DeleteAllUserSessionsResponse,
-} from 'cryptomath-api-proto/proto/build/auth';
+} from 'cryptomath-api-proto/types/auth';
 import { AuthService } from './auth.service';
 import { AccessSessionSerializerService } from './serializers/access-session.serializer';
 
-@Controller('auth')
+@Controller()
 @AuthServiceControllerMethods()
 export class AuthController implements AuthServiceController {
   constructor(

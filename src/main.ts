@@ -24,6 +24,10 @@ async function bootstrap() {
     },
   });
 
+  await app.init();
+
+  app.enableShutdownHooks();
+
   app.startAllMicroservices(() =>
     console.log(`Auth microservice is listening on ${url}`),
   );

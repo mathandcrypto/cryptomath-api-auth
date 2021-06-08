@@ -7,19 +7,17 @@ generator client {
   provider = "prisma-client-js"
 }
 
-model AuthSession {
+model AccessSession {
     id  Int      @id @default(autoincrement())
     userId  Int @unique
     accessSecret    String
     createdAt   DateTime @default(now())
     updatedAt   DateTime @default(now())
-    refreshSessions RefreshSession[]
 }
 
 model RefreshSession {
     id  Int      @id @default(autoincrement())
+    userId  Int
     refreshSecret   String
     createdAt   DateTime @default(now())
-    authSession AuthSession? @relation(fields: [authSessionId], references: [id])
-    authSessionId   Int?
 }

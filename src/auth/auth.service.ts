@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { CreateAuthSessionResponse } from './interfaces/create-auth-session-response.interface';
-import { AuthSession } from '@prisma/client';
+import { CreateAccessSessionResponse } from './interfaces/create-access-session-response.interface';
+import { CreateRefreshSessionResponse } from './interfaces/create-refresh-session-response.interface';
+import { AccessSession, RefreshSession } from '@prisma/client';
 import { PrismaService } from '@providers/prisma/prisma.service';
 import { EncryptionService } from '@encryption/encryption.service';
 import { AuthConfigService } from '@config/auth/config.service';
@@ -16,32 +17,61 @@ export class AuthService {
     private readonly authConfigService: AuthConfigService,
   ) {}
 
-  async createAuthSession(
+  async createAccessSession(
     userId: number,
-  ): Promise<[boolean, CreateAuthSessionResponse]> {
+  ): Promise<[boolean, CreateAccessSessionResponse]> {
     const accessSecret = await this.encryptionService.generateSecret(userId);
-    const refreshSecret = await this.encryptionService.generateSecret(
-      userId,
-      accessSecret,
-      11,
-    );
 
     try {
-      const auth = await this.prisma.authSession.create({
+      const accessSession = await this.prisma.accessSession.create({
         data: {
           userId,
           accessSecret,
-          refreshSessions: {
-            create: [{ refreshSecret }],
-          },
         },
       });
 
       return [
         true,
         {
-          id: auth.id,
+          id: accessSession.id,
           accessSecret,
+        },
+      ];
+    } catch (error) {
+      this.logger.error(error);
+
+      return [false, null];
+    }
+  }
+
+  async createRefreshSession(
+    userId: number,
+    accessSecret: string,
+  ): Promise<[boolean, CreateRefreshSessionResponse]> {
+    const refreshSecret = await this.encryptionService.generateSecret(
+      userId,
+      accessSecret,
+    );
+
+    try {
+      const refreshSessionsCount = await this.prisma.refreshSession.count({
+        where: { userId },
+      });
+
+      if (refreshSessionsCount >= this.authConfigService.maxRefreshSessions) {
+        await this.prisma.refreshSession.deleteMany({
+          where: { userId },
+        });
+      }
+
+      const refreshSession = await this.prisma.refreshSession.create({
+        data: { userId, refreshSecret },
+      });
+
+      return [
+        true,
+        {
+          id: refreshSession.id,
           refreshSecret,
         },
       ];
@@ -52,23 +82,23 @@ export class AuthService {
     }
   }
 
-  async findAuthSessionByUserAndSecret(
+  async findAccessSessionByUserAndSecret(
     userId: number,
     accessSecret: string,
-  ): Promise<[boolean, AuthSession]> {
+  ): Promise<[boolean, AccessSession]> {
     try {
-      const authSession = await this.prisma.authSession.findFirst({
+      const accessSession = await this.prisma.accessSession.findFirst({
         where: {
           userId,
           accessSecret,
         },
       });
 
-      if (!authSession) {
+      if (!accessSession) {
         return [false, null];
       }
 
-      return [true, authSession];
+      return [true, accessSession];
     } catch (error) {
       this.logger.error(error);
 
@@ -76,25 +106,59 @@ export class AuthService {
     }
   }
 
-  checkAuthSessionExpiration(authSession: AuthSession): boolean {
+  async findRefreshSessionByUserAndSecret(
+    userId: number,
+    refreshSecret: string,
+  ): Promise<[boolean, RefreshSession]> {
+    try {
+      const refreshSession = await this.prisma.refreshSession.findFirst({
+        where: {
+          userId,
+          refreshSecret,
+        },
+      });
+
+      if (!refreshSession) {
+        return [false, null];
+      }
+
+      return [true, refreshSession];
+    } catch (error) {
+      this.logger.error(error);
+
+      return [false, null];
+    }
+  }
+
+  checkAccessSessionExpiration(accessSession: AccessSession): boolean {
     return (
-      this.authConfigService.authSessionExpirationDate.getTime() -
-        authSession.updatedAt.getTime() >
+      this.authConfigService.accessSessionExpirationDate.getTime() -
+        accessSession.updatedAt.getTime() >
       0
     );
   }
 
-  async findAuthSessionByUser(userId: number): Promise<[boolean, AuthSession]> {
+  checkRefreshSessionExpiration(refreshSession: RefreshSession): boolean {
+    return (
+      this.authConfigService.refreshSessionExpirationDate.getTime() -
+        refreshSession.createdAt.getTime() >
+      0
+    );
+  }
+
+  async findAccessSessionByUser(
+    userId: number,
+  ): Promise<[boolean, AccessSession]> {
     try {
-      const authSession = await this.prisma.authSession.findUnique({
+      const accessSession = await this.prisma.accessSession.findUnique({
         where: { userId },
       });
 
-      if (!authSession) {
+      if (!accessSession) {
         return [false, null];
       }
 
-      return [true, authSession];
+      return [true, accessSession];
     } catch (error) {
       this.logger.error(error);
 
@@ -102,52 +166,77 @@ export class AuthService {
     }
   }
 
-  async deleteAuthSession(userId: number): Promise<boolean> {
-    const [isSessionExists, authSession] = await this.findAuthSessionByUser(
-      userId,
-    );
-
-    if (isSessionExists) {
-      const deleteRefreshSessions = this.prisma.refreshSession.deleteMany({
-        where: {
-          authSessionId: authSession.id,
-        },
+  async deleteAccessSession(userId: number): Promise<boolean> {
+    try {
+      await this.prisma.accessSession.delete({
+        where: { userId },
       });
 
-      const deleteAuthSession = this.prisma.authSession.delete({
-        where: {
-          id: authSession.id,
-        },
-      });
-
-      try {
-        await this.prisma.$transaction([
-          deleteRefreshSessions,
-          deleteAuthSession,
-        ]);
-      } catch (error) {
+      return true;
+    } catch (error) {
+      if (error.code !== 'P2025') {
         this.logger.error(error);
-
-        return false;
       }
-    }
 
-    return true;
+      return false;
+    }
+  }
+
+  async deleteRefreshSession(
+    userId: number,
+    refreshSecret: string,
+  ): Promise<boolean> {
+    try {
+      await this.prisma.refreshSession.deleteMany({
+        where: { AND: [{ userId }, { refreshSecret }] },
+      });
+
+      return true;
+    } catch (error) {
+      if (error.code !== 'P2025') {
+        this.logger.error(error);
+      }
+
+      return false;
+    }
+  }
+
+  async deleteAllUserSessions(userId: number): Promise<boolean> {
+    const deleteAccessSession = this.prisma.accessSession.delete({
+      where: { userId },
+    });
+
+    const deleteRefreshSessions = this.prisma.refreshSession.deleteMany({
+      where: { userId },
+    });
+
+    try {
+      await this.prisma.$transaction([
+        deleteAccessSession,
+        deleteRefreshSessions,
+      ]);
+
+      return true;
+    } catch (error) {
+      this.logger.error(error);
+
+      return false;
+    }
   }
 
   @Cron('0 30 * * * *')
-  async deleteExpiredAuthSessions() {
+  async deleteExpiredAccessSessions() {
     try {
-      const deleteAuthSessions = await this.prisma.authSession.deleteMany({
+      const deleteAccessSessions = await this.prisma.accessSession.deleteMany({
         where: {
           updatedAt: {
-            lte: this.authConfigService.refreshSessionExpirationDate,
+            lte: this.authConfigService.accessSessionExpirationDate,
           },
         },
       });
 
       this.logger.log(
-        `Deleted ${deleteAuthSessions.count} expired auth sessions`,
+        `Deleted ${deleteAccessSessions.count} expired access sessions`,
       );
     } catch (error) {
       this.logger.error(error);
@@ -160,18 +249,9 @@ export class AuthService {
       const deleteRefreshSessions = await this.prisma.refreshSession.deleteMany(
         {
           where: {
-            OR: [
-              {
-                createdAt: {
-                  lte: this.authConfigService.refreshSessionExpirationDate,
-                },
-              },
-              {
-                authSessionId: {
-                  equals: null,
-                },
-              },
-            ],
+            createdAt: {
+              lte: this.authConfigService.refreshSessionExpirationDate,
+            },
           },
         },
       );

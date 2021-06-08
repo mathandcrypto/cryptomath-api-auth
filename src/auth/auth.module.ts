@@ -3,12 +3,12 @@ import { PrismaModule } from '@providers/prisma/prisma.module';
 import { AuthConfigModule } from '@config/auth/config.module';
 import { EncryptionModule } from '@encryption/encryption.module';
 import { AuthController } from './auth.controller';
-import { AuthSessionSerializerService } from './serializers/auth-session.serializer';
+import { AccessSessionSerializerService } from './serializers/access-session.serializer';
 import { AuthService } from './auth.service';
 
 @Module({
   imports: [PrismaModule, AuthConfigModule, EncryptionModule],
   controllers: [AuthController],
-  providers: [AuthSessionSerializerService, AuthService],
+  providers: [AccessSessionSerializerService, AuthService],
 })
 export class AuthModule {}

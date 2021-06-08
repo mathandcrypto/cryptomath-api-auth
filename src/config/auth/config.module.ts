@@ -9,8 +9,9 @@ import { AuthConfigService } from './config.service';
     ConfigModule.forRoot({
       load: [configuration],
       validationSchema: Joi.object({
-        AUTH_SESSION_MAX_AGE: Joi.number().min(1).max(60),
+        ACCESS_SESSION_MAX_AGE: Joi.number().min(1).max(60),
         REFRESH_SESSION_MAX_AGE: Joi.number().min(1).max(30),
+        MAX_REFRESH_SESSIONS: Joi.number().default(5),
       }),
     }),
   ],

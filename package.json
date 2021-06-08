@@ -40,7 +40,7 @@
     "@nestjs/schedule": "^0.4.3",
     "@prisma/client": "^2.22.1",
     "bcrypt": "^5.0.1",
-    "cryptomath-api-proto": "file:../cryptomath-api-proto",
+    "cryptomath-api-proto": "github:mathandcrypto/cryptomath-api-proto",
     "grpc": "^1.24.7",
     "joi": "^17.4.0",
     "reflect-metadata": "^0.1.13",

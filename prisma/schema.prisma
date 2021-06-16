@@ -19,5 +19,7 @@ model RefreshSession {
     id  Int      @id @default(autoincrement())
     userId  Int
     refreshSecret   String
+    ip  String
+    userAgent   String
     createdAt   DateTime @default(now())
 }

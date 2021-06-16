@@ -17,6 +17,7 @@ import {
 } from 'cryptomath-api-proto/types/auth';
 import { AuthService } from './auth.service';
 import { AccessSessionSerializerService } from './serializers/access-session.serializer';
+import { RefreshSessionSerializerService } from './serializers/refresh-session.serializer';
 
 @Controller()
 @AuthServiceControllerMethods()
@@ -24,10 +25,13 @@ export class AuthController implements AuthServiceController {
   constructor(
     private readonly authService: AuthService,
     private readonly accessSessionSerializerService: AccessSessionSerializerService,
+    private readonly refreshSessionSerializerService: RefreshSessionSerializerService,
   ) {}
 
   async createAccessSession({
     userId,
+    ip,
+    userAgent,
   }: CreateAccessSessionRequest): Promise<CreateAccessSessionResponse> {
     await this.authService.deleteAccessSession(userId);
 
@@ -40,33 +44,44 @@ export class AuthController implements AuthServiceController {
       return {
         isAccessSessionCreated: false,
         isRefreshSessionCreated: false,
+        accessSessionId: null,
         accessSecret: '',
+        refreshSessionId: null,
         refreshSecret: '',
       };
     }
 
-    const { accessSecret } = accessSessionResponse;
+    const { accessSecret, id: accessSessionId } = accessSessionResponse;
 
     const [
       isRefreshSessionCreated,
       refreshSession,
-    ] = await this.authService.createRefreshSession(userId, accessSecret);
+    ] = await this.authService.createRefreshSession(
+      userId,
+      accessSecret,
+      ip,
+      userAgent,
+    );
 
     if (!isRefreshSessionCreated) {
       return {
         isAccessSessionCreated: true,
         isRefreshSessionCreated: false,
+        accessSessionId,
         accessSecret: '',
+        refreshSessionId: null,
         refreshSecret: '',
       };
     }
 
-    const { refreshSecret } = refreshSession;
+    const { refreshSecret, id: refreshSessionId } = refreshSession;
 
     return {
       isAccessSessionCreated: true,
       isRefreshSessionCreated: true,
+      accessSessionId,
       accessSecret,
+      refreshSessionId,
       refreshSecret,
     };
   }
@@ -128,6 +143,7 @@ export class AuthController implements AuthServiceController {
       return {
         isSessionExists: false,
         isSessionExpired: false,
+        refreshSession: null,
       };
     }
 
@@ -139,33 +155,64 @@ export class AuthController implements AuthServiceController {
       return {
         isSessionExists: true,
         isSessionExpired: true,
+        refreshSession: null,
       };
     }
 
     return {
       isSessionExists: true,
       isSessionExpired: false,
+      refreshSession: await this.refreshSessionSerializerService.serialize(
+        refreshSession,
+      ),
     };
   }
 
   async deleteAccessSession({
     userId,
   }: DeleteAccessSessionRequest): Promise<DeleteAccessSessionResponse> {
-    const isSessionDeleted = await this.authService.deleteAccessSession(userId);
+    const [
+      isSessionDeleted,
+      accessSession,
+    ] = await this.authService.deleteAccessSession(userId);
 
-    return { isSessionDeleted };
+    if (!isSessionDeleted) {
+      return {
+        isSessionDeleted: false,
+        accessSession: null,
+      };
+    }
+
+    return {
+      isSessionDeleted: true,
+      accessSession: await this.accessSessionSerializerService.serialize(
+        accessSession,
+      ),
+    };
   }
 
   async deleteRefreshSession({
     userId,
     refreshSecret,
   }: DeleteRefreshSessionRequest): Promise<DeleteRefreshSessionResponse> {
-    const isSessionDeleted = await this.authService.deleteRefreshSession(
-      userId,
-      refreshSecret,
-    );
+    const [
+      isSessionDeleted,
+      refreshSession,
+    ] = await this.authService.deleteRefreshSession(userId, refreshSecret);
 
-    return { isSessionDeleted };
+    if (!isSessionDeleted) {
+      return {
+        isSessionDeleted: false,
+        refreshSession: null,
+      };
+    }
+
+    return {
+      isSessionDeleted: true,
+      refreshSession: await this.refreshSessionSerializerService.serialize(
+        refreshSession,
+      ),
+    };
   }
 
   async deleteAllUserSessions({

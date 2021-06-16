@@ -47,6 +47,8 @@ export class AuthService {
   async createRefreshSession(
     userId: number,
     accessSecret: string,
+    ip: string,
+    userAgent: string
   ): Promise<[boolean, CreateRefreshSessionResponse]> {
     const refreshSecret = await this.encryptionService.generateSecret(
       userId,
@@ -65,7 +67,7 @@ export class AuthService {
       }
 
       const refreshSession = await this.prisma.refreshSession.create({
-        data: { userId, refreshSecret },
+        data: { userId, refreshSecret, ip, userAgent },
       });
 
       return [
@@ -166,38 +168,44 @@ export class AuthService {
     }
   }
 
-  async deleteAccessSession(userId: number): Promise<boolean> {
+  async deleteAccessSession(userId: number): Promise<[boolean, AccessSession]> {
     try {
-      await this.prisma.accessSession.delete({
+      const deletedSession = await this.prisma.accessSession.delete({
         where: { userId },
       });
 
-      return true;
+      return [true, deletedSession];
     } catch (error) {
       if (error.code !== 'P2025') {
         this.logger.error(error);
       }
 
-      return false;
+      return [false, null];
     }
   }
 
   async deleteRefreshSession(
     userId: number,
     refreshSecret: string,
-  ): Promise<boolean> {
+  ): Promise<[boolean, RefreshSession]> {
     try {
-      await this.prisma.refreshSession.deleteMany({
+      const refreshSession = await this.prisma.refreshSession.findFirst({
         where: { AND: [{ userId }, { refreshSecret }] },
       });
 
-      return true;
-    } catch (error) {
-      if (error.code !== 'P2025') {
-        this.logger.error(error);
+      if (!refreshSession) {
+        return [false, null];
       }
 
-      return false;
+      const deletedSession = await this.prisma.refreshSession.delete({
+        where: { id: refreshSession.id },
+      });
+
+      return [true, deletedSession];
+    } catch (error) {
+      this.logger.error(error);
+
+      return [false, null];
     }
   }
 

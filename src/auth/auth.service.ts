@@ -48,7 +48,7 @@ export class AuthService {
     userId: number,
     accessSecret: string,
     ip: string,
-    userAgent: string
+    userAgent: string,
   ): Promise<[boolean, CreateRefreshSessionResponse]> {
     const refreshSecret = await this.encryptionService.generateSecret(
       userId,

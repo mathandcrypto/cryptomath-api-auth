@@ -14,7 +14,7 @@ import {
   DeleteRefreshSessionResponse,
   DeleteAllUserSessionsRequest,
   DeleteAllUserSessionsResponse,
-} from 'cryptomath-api-proto/types/auth';
+} from '@cryptomath/cryptomath-api-proto/types/auth';
 import { AuthService } from './auth.service';
 import { AccessSessionSerializerService } from './serializers/access-session.serializer';
 import { RefreshSessionSerializerService } from './serializers/refresh-session.serializer';
@@ -35,53 +35,39 @@ export class AuthController implements AuthServiceController {
   }: CreateAccessSessionRequest): Promise<CreateAccessSessionResponse> {
     await this.authService.deleteAccessSession(userId);
 
-    const [
-      isAccessSessionCreated,
-      accessSessionResponse,
-    ] = await this.authService.createAccessSession(userId);
+    const [isAccessSessionCreated, accessSecret] =
+      await this.authService.createAccessSession(userId);
 
     if (!isAccessSessionCreated) {
       return {
         isAccessSessionCreated: false,
         isRefreshSessionCreated: false,
-        accessSessionId: null,
         accessSecret: '',
-        refreshSessionId: null,
         refreshSecret: '',
       };
     }
 
-    const { accessSecret, id: accessSessionId } = accessSessionResponse;
-
-    const [
-      isRefreshSessionCreated,
-      refreshSession,
-    ] = await this.authService.createRefreshSession(
-      userId,
-      accessSecret,
-      ip,
-      userAgent,
-    );
+    const [isRefreshSessionCreated, refreshSecret] =
+      await this.authService.createRefreshSession(
+        userId,
+        accessSecret,
+        ip,
+        userAgent,
+      );
 
     if (!isRefreshSessionCreated) {
       return {
         isAccessSessionCreated: true,
         isRefreshSessionCreated: false,
-        accessSessionId,
         accessSecret: '',
-        refreshSessionId: null,
         refreshSecret: '',
       };
     }
 
-    const { refreshSecret, id: refreshSessionId } = refreshSession;
-
     return {
       isAccessSessionCreated: true,
       isRefreshSessionCreated: true,
-      accessSessionId,
       accessSecret,
-      refreshSessionId,
       refreshSecret,
     };
   }
@@ -90,13 +76,11 @@ export class AuthController implements AuthServiceController {
     userId,
     accessSecret,
   }: ValidateAccessSessionRequest): Promise<ValidateAccessSessionResponse> {
-    const [
-      isAccessSessionExists,
-      accessSession,
-    ] = await this.authService.findAccessSessionByUserAndSecret(
-      userId,
-      accessSecret,
-    );
+    const [isAccessSessionExists, accessSession] =
+      await this.authService.findAccessSessionByUserAndSecret(
+        userId,
+        accessSecret,
+      );
 
     if (!isAccessSessionExists) {
       return {
@@ -106,9 +90,8 @@ export class AuthController implements AuthServiceController {
       };
     }
 
-    const isSessionExpired = this.authService.checkAccessSessionExpiration(
-      accessSession,
-    );
+    const isSessionExpired =
+      this.authService.checkAccessSessionExpiration(accessSession);
 
     if (isSessionExpired) {
       return {
@@ -131,13 +114,11 @@ export class AuthController implements AuthServiceController {
     userId,
     refreshSecret,
   }: ValidateRefreshSessionRequest): Promise<ValidateRefreshSessionResponse> {
-    const [
-      isRefreshSessionExists,
-      refreshSession,
-    ] = await this.authService.findRefreshSessionByUserAndSecret(
-      userId,
-      refreshSecret,
-    );
+    const [isRefreshSessionExists, refreshSession] =
+      await this.authService.findRefreshSessionByUserAndSecret(
+        userId,
+        refreshSecret,
+      );
 
     if (!isRefreshSessionExists) {
       return {
@@ -147,9 +128,8 @@ export class AuthController implements AuthServiceController {
       };
     }
 
-    const isSessionExpired = this.authService.checkRefreshSessionExpiration(
-      refreshSession,
-    );
+    const isSessionExpired =
+      this.authService.checkRefreshSessionExpiration(refreshSession);
 
     if (isSessionExpired) {
       return {
@@ -171,10 +151,8 @@ export class AuthController implements AuthServiceController {
   async deleteAccessSession({
     userId,
   }: DeleteAccessSessionRequest): Promise<DeleteAccessSessionResponse> {
-    const [
-      isSessionDeleted,
-      accessSession,
-    ] = await this.authService.deleteAccessSession(userId);
+    const [isSessionDeleted, accessSession] =
+      await this.authService.deleteAccessSession(userId);
 
     if (!isSessionDeleted) {
       return {
@@ -195,10 +173,8 @@ export class AuthController implements AuthServiceController {
     userId,
     refreshSecret,
   }: DeleteRefreshSessionRequest): Promise<DeleteRefreshSessionResponse> {
-    const [
-      isSessionDeleted,
-      refreshSession,
-    ] = await this.authService.deleteRefreshSession(userId, refreshSecret);
+    const [isSessionDeleted, refreshSession] =
+      await this.authService.deleteRefreshSession(userId, refreshSecret);
 
     if (!isSessionDeleted) {
       return {

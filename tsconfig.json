@@ -11,10 +11,10 @@
     "outDir": "./dist",
     "baseUrl": "./src",
     "incremental": true,
+    "skipLibCheck": true,
     "paths": {
       "@common/*": ["common/*"],
       "@config/*": ["config/*"],
-      "@encryption/*": ["encryption/*"],
       "@auth/*": ["auth/*"],
       "@providers/*": ["providers/*"]
     }

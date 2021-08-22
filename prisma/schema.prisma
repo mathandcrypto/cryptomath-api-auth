@@ -8,16 +8,16 @@ generator client {
 }
 
 model AccessSession {
-    id  Int      @id @default(autoincrement())
+    accessSecret    String  @id
     userId  Int @unique
-    accessSecret    String
     createdAt   DateTime @default(now())
     updatedAt   DateTime @default(now())
 }
 
 model RefreshSession {
-    id  Int      @id @default(autoincrement())
+    refreshSecret   String  @id
     userId  Int
-    refreshSecret   String
+    ip  String
+    userAgent   String
     createdAt   DateTime @default(now())
 }

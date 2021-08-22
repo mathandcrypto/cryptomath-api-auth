@@ -1,10 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { CreateAccessSessionResponse } from './interfaces/create-access-session-response.interface';
-import { CreateRefreshSessionResponse } from './interfaces/create-refresh-session-response.interface';
 import { AccessSession, RefreshSession } from '@prisma/client';
 import { PrismaService } from '@providers/prisma/prisma.service';
-import { EncryptionService } from '@encryption/encryption.service';
+import { EncryptionService } from './encryption.service';
 import { AuthConfigService } from '@config/auth/config.service';
 
 @Injectable()
@@ -17,37 +15,31 @@ export class AuthService {
     private readonly authConfigService: AuthConfigService,
   ) {}
 
-  async createAccessSession(
-    userId: number,
-  ): Promise<[boolean, CreateAccessSessionResponse]> {
+  async createAccessSession(userId: number): Promise<[boolean, string]> {
     const accessSecret = await this.encryptionService.generateSecret(userId);
 
     try {
-      const accessSession = await this.prisma.accessSession.create({
+      await this.prisma.accessSession.create({
         data: {
           userId,
           accessSecret,
         },
       });
 
-      return [
-        true,
-        {
-          id: accessSession.id,
-          accessSecret,
-        },
-      ];
+      return [true, accessSecret];
     } catch (error) {
       this.logger.error(error);
 
-      return [false, null];
+      return [false, ''];
     }
   }
 
   async createRefreshSession(
     userId: number,
     accessSecret: string,
-  ): Promise<[boolean, CreateRefreshSessionResponse]> {
+    ip: string,
+    userAgent: string,
+  ): Promise<[boolean, string]> {
     const refreshSecret = await this.encryptionService.generateSecret(
       userId,
       accessSecret,
@@ -64,21 +56,15 @@ export class AuthService {
         });
       }
 
-      const refreshSession = await this.prisma.refreshSession.create({
-        data: { userId, refreshSecret },
+      await this.prisma.refreshSession.create({
+        data: { userId, refreshSecret, ip, userAgent },
       });
 
-      return [
-        true,
-        {
-          id: refreshSession.id,
-          refreshSecret,
-        },
-      ];
+      return [true, refreshSecret];
     } catch (error) {
       this.logger.error(error);
 
-      return [false, null];
+      return [false, ''];
     }
   }
 
@@ -87,14 +73,13 @@ export class AuthService {
     accessSecret: string,
   ): Promise<[boolean, AccessSession]> {
     try {
-      const accessSession = await this.prisma.accessSession.findFirst({
+      const accessSession = await this.prisma.accessSession.findUnique({
         where: {
-          userId,
           accessSecret,
         },
       });
 
-      if (!accessSession) {
+      if (!accessSession || accessSession.userId !== userId) {
         return [false, null];
       }
 
@@ -166,38 +151,44 @@ export class AuthService {
     }
   }
 
-  async deleteAccessSession(userId: number): Promise<boolean> {
+  async deleteAccessSession(userId: number): Promise<[boolean, AccessSession]> {
     try {
-      await this.prisma.accessSession.delete({
+      const deletedSession = await this.prisma.accessSession.delete({
         where: { userId },
       });
 
-      return true;
+      return [true, deletedSession];
     } catch (error) {
       if (error.code !== 'P2025') {
         this.logger.error(error);
       }
 
-      return false;
+      return [false, null];
     }
   }
 
   async deleteRefreshSession(
     userId: number,
     refreshSecret: string,
-  ): Promise<boolean> {
+  ): Promise<[boolean, RefreshSession]> {
     try {
-      await this.prisma.refreshSession.deleteMany({
+      const refreshSession = await this.prisma.refreshSession.findFirst({
         where: { AND: [{ userId }, { refreshSecret }] },
       });
 
-      return true;
-    } catch (error) {
-      if (error.code !== 'P2025') {
-        this.logger.error(error);
+      if (!refreshSession) {
+        return [false, null];
       }
 
-      return false;
+      const deletedSession = await this.prisma.refreshSession.delete({
+        where: { refreshSecret: refreshSession.refreshSecret },
+      });
+
+      return [true, deletedSession];
+    } catch (error) {
+      this.logger.error(error);
+
+      return [false, null];
     }
   }
 
